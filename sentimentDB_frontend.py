@@ -52,6 +52,7 @@ def main():
 
             # Display Game Logo
             st.image(game_data["logo_url"], caption=selected_game, use_container_width=True)
+            # st.image(S3[f"{game_name}header.jpg"])
 
             # Display Average Rating
             st.write(f"**Average Rating:** {game_data['avg_rating']} / 10")
