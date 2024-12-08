@@ -32,7 +32,7 @@ def write_to_db(conn, df, file_name, review_table="game_reviews", name_table="vi
 
         # insert reviews
         for _, row in df.iterrows():
-            values = f"{game_id}, '{row['cleaned_review']}', {NULL}}"
+            values = f"{game_id}, '{row['cleaned_review']}', {NULL}"
             sql_query = f"INSERT INTO {review_table} (game_id, review_text, score) VALUES ({values})"
             cursor.execute(sql_query)
 
