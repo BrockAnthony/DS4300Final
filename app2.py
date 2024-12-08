@@ -22,8 +22,8 @@ def fetch_game_data(conn, game_title):
     try:
         query = f"""
         SELECT v.game_name, r.review_text, r.score
-        FROM video_games v 
-        JOIN game_reviews r ON v.game_id = r.game_id 
+        FROM video_games v
+        JOIN game_reviews r ON v.game_id = r.game_id
         WHERE LOWER(v.game_name) LIKE LOWER(%s)
         """
         cursor.execute(query, (f"%{game_title}%",))
@@ -44,7 +44,7 @@ def write_to_db(conn, df, game_title):
         game_id = cursor.fetchone()[0]
 
         for _, row in df.iterrows():
-            review_text = row['review_text']
+            review_text = row['cleaned_review']
             cursor.execute(
                 "INSERT INTO game_reviews (game_id, review_text, score) VALUES (%s, %s, NULL)",
                 (game_id, review_text)
@@ -104,40 +104,58 @@ def main():
 
         if selected_game:
             conn = connect_to_db(db_params)
-            if conn:
-                game_data = fetch_game_data(conn, selected_game)
-                conn.close()
+            cursor = conn.cursor()
+            sql_query = f"SELECT game_name FROM video_games;"
+            cursor.execute(sql_query)
+            games = cursor.fetchall()
 
-                if game_data:
-                    st.subheader(f"Results for '{selected_game}'")
+            choices = []
+            for game in games:
+                game = game[0][:-8]
+                if selected_game in game:
+                    choices.append(game)
 
-                    # Create DataFrame for search results
-                    df = pd.DataFrame(game_data, columns=["Game Title", "Review Text", "Sentiment Score"])
-                    avg_sentiment = df["Sentiment Score"].mean()
+            if len(choices) > 0:
+                selected_game = st.selectbox("Choose Matching Game", list(choices), placeholder="Game")
+            else:
+                st.write("No games with search term.")
+                selected_game = None
 
-                    # Determine sentiment description
-                    sentiment_description = (
-                        "Positive" if avg_sentiment > 0.05 else 
-                        "Neutral" if avg_sentiment == 0 else 
-                        "Negative"
-                    )
+            if selected_game:
+                if conn:
+                    game_data = fetch_game_data(conn, selected_game)
+                    conn.close()
 
-                    # Display sentiment and reviews
-                    st.write(f"**Average Sentiment:** {avg_sentiment:.2f} ({sentiment_description})")
-                    
-                    # Display game logo from S3 bucket
-                    game_logo_url = f"https://ds4300-logos.s3.us-east-1.amazonaws.com/4300_logos/{selected_game.replace(' ', '_').lower()}.jpg"
+                    if game_data:
+                        st.subheader(f"Results for '{selected_game}'")
 
-                    st.image(
-                        game_logo_url,
-                        caption=selected_game.title(),  # Proper title formatting
-                        use_container_width=True,
-                    )
+                        # Create DataFrame for search results
+                        df = pd.DataFrame(game_data, columns=["Game Title", "Review Text", "Sentiment Score"])
+                        avg_sentiment = df["Sentiment Score"].mean()
 
-                    # Show game review DataFrame
-                    st.dataframe(df)
-                else:
-                    st.error("No matching games found!")
+                        # Determine sentiment description
+                        sentiment_description = (
+                            "Positive" if avg_sentiment > 0.05 else
+                            "Neutral" if avg_sentiment == 0 else
+                            "Negative"
+                        )
+
+                        # Display sentiment and reviews
+                        st.write(f"**Average Sentiment:** {avg_sentiment:.2f} ({sentiment_description})")
+
+                        # Display game logo from S3 bucket
+                        game_logo_url = f"https://ds4300-logos.s3.us-east-1.amazonaws.com/4300_logos/{selected_game.replace(' ', '_').lower()}.jpg"
+
+                        st.image(
+                            game_logo_url,
+                            caption=selected_game.title(),  # Proper title formatting
+                            use_container_width=True,
+                        )
+
+                        # Show game review DataFrame
+                        st.dataframe(df)
+                    else:
+                        st.error("No matching games found!")
 
     # Tab 2: Upload Reviews (Upload to RDS/Trigger Lambda)
     with tab2:
