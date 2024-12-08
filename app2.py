@@ -4,18 +4,24 @@ import psycopg2
 import boto3
 import json
 
-# AWS and DB Config (adjust these variables)
-AWS_REGION = "us-east-1"
-RDS_HOST = "vg-reviews-database.c1w6iqe62olg.us-east-1.rds.amazonaws.com"
-RDS_DB = "postgres"
-RDS_USER = "username"
-RDS_PASSWORD = "0RW14yFmrJ4P9MgW44Bd"
+AWS_REGION = "us-east-2"
 
 # Connect to RDS PostgreSQL
 def connect_db():
+
+    with open("credentials.json", "r") as f:
+        creds = json.load(f)
+
+    db_params = {
+    'host': 'reviews.cfim2eisunwi.us-east-2.rds.amazonaws.com',
+    'database': 'postgres',
+    'user': creds["credentials"]["username"],
+    'password': creds["credentials"]["password"]
+    }
+
     try:
         conn = psycopg2.connect(
-            host=RDS_HOST, database=RDS_DB, user=RDS_USER, password=RDS_PASSWORD
+            host=db_params["host"], database=db_params["database"], user=db_params["user"], password=db_params["password"]
         )
         return conn
     except psycopg2.Error as e:
@@ -66,10 +72,10 @@ def upload_reviews_to_rds(df):
         # Add sentiment column if missing
         cursor.execute(
             f"""
-            DO $$ 
+            DO $$
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
+                    SELECT 1 FROM information_schema.columns
                     WHERE table_name = '{table_name}' AND column_name = 'sentiment'
                 ) THEN
                     ALTER TABLE {table_name} ADD COLUMN sentiment NUMERIC;
@@ -110,7 +116,7 @@ def fetch_game_data(game_title):
         # Fetch unique game title and average sentiment
         cursor.execute(
             f"""
-            SELECT DISTINCT title, AVG(sentiment) 
+            SELECT DISTINCT title, AVG(sentiment)
             FROM {table_name}
             WHERE title ILIKE %s
             GROUP BY title
@@ -131,6 +137,7 @@ def fetch_game_data(game_title):
 
 # Main function for Streamlit
 def main():
+
     st.title("Video Game Sentiment Dashboard")
 
     # Tab Setup
@@ -145,7 +152,7 @@ def main():
             game_data = fetch_game_data(selected_game)
             if game_data:
                 for game_title_tuple in game_data:
-                    game_title, avg_sentiment = game_title_tuple 
+                    game_title, avg_sentiment = game_title_tuple
                     st.subheader(game_title)
 
                     st.image(
@@ -156,8 +163,8 @@ def main():
 
                     # Determine sentiment description
                     sentiment_description = (
-                        "Positive" if avg_sentiment > 0.5 else 
-                        "Neutral" if avg_sentiment == 0 else 
+                        "Positive" if avg_sentiment > 0.5 else
+                        "Neutral" if avg_sentiment == 0 else
                         "Negative"
                     )
 
@@ -180,7 +187,7 @@ def main():
 
                 # Extract game title from the uploaded CSV
                 game_title = df['title'].iloc[0].replace(" ", "_").lower()
-    
+
                 # Trigger Lambda with the correct game title
                 trigger_lambda(game_title)
 
